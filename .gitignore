@@ -1,0 +1,63 @@
+# ─── Entorno ───────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Node / NestJS / React ─────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+.cache/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+*.egg
+.pytest_cache/
+.mypy_cache/
+*.ipynb_checkpoints/
+
+# ─── Modelos entrenados (archivos grandes) ─────────────────────────────────────
+ml/models/*.pkl
+ml/models/*.joblib
+ml/models/*.h5
+ml/models/*.pt
+# Conservar la carpeta vacía
+!ml/models/.gitkeep
+
+# ─── Dataset (archivos grandes) ────────────────────────────────────────────────
+ml/data/*.csv
+ml/data/*.parquet
+ml/data/*.json
+!ml/data/.gitkeep
+*.csv
+
+# ─── Docker ────────────────────────────────────────────────────────────────────
+docker-data/
+
+# ─── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ─── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
