@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,9 +9,13 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Ruta al directorio de modelos: sube dos niveles desde /ml-service/app → raíz,
-# luego baja a /ml/models
-_MODELS_DIR = Path(__file__).parent.parent.parent / "ml" / "models"
+# Directorio de modelos. Configurable con MODEL_DIR (útil al dockerizar);
+# por defecto sube desde /ml-service/app hasta la raíz y baja a /ml/models.
+_DEFAULT_MODELS_DIR = Path(__file__).parent.parent.parent / "ml" / "models"
+_MODELS_DIR = Path(os.getenv("MODEL_DIR", str(_DEFAULT_MODELS_DIR)))
+
+# Umbrales de riesgo por defecto; el metadata del modelo puede sobreescribirlos.
+_DEFAULT_THRESHOLDS = {"medio": 0.30, "alto": 0.60}
 
 
 @lru_cache(maxsize=1)
@@ -48,9 +53,10 @@ def predict(features: dict) -> tuple[float, str]:
 
     prob: float = float(pipeline.predict_proba(df)[0, 1])
 
-    if prob < 0.30:
+    thresholds = metadata.get("risk_thresholds", _DEFAULT_THRESHOLDS)
+    if prob < thresholds["medio"]:
         label = "bajo"
-    elif prob < 0.60:
+    elif prob < thresholds["alto"]:
         label = "medio"
     else:
         label = "alto"
