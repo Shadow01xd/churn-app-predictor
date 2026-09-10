@@ -264,6 +264,35 @@ button.danger {
   gap: 12px 16px;
 }
 
+.field input:disabled,
+.field select:disabled {
+  background: #f1f2f4;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.field-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.field-hint.muted {
+  color: var(--muted);
+}
+
+.field-hint .secondary {
+  padding: 2px 4px;
+  font-size: 0.78rem;
+}
+
+.field-hint .warn {
+  color: var(--risk-mid);
+  font-weight: 600;
+}
+
 /* ── Detalle ─────────────────────────────────────────────────────────────── */
 .prediction-card {
   background: var(--card);

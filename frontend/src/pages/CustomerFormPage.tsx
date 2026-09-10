@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
 import Layout from '../components/Layout';
@@ -10,6 +10,40 @@ import {
 } from '../customers/types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const INTERNET_ADDONS: (keyof CustomerInput)[] = [
+  'OnlineSecurity',
+  'OnlineBackup',
+  'DeviceProtection',
+  'TechSupport',
+  'StreamingTV',
+  'StreamingMovies',
+];
+
+/**
+ * Fuerza las dependencias del dataset Telco: sin internet → add-ons en
+ * "Sin internet"; sin teléfono → "Múltiples líneas" en "Sin servicio
+ * telefónico" (y viceversa al reactivar el servicio).
+ */
+function normalizeCoherence(form: CustomerInput): CustomerInput {
+  const next = { ...form } as Record<string, unknown>;
+
+  if (next.InternetService === 'No') {
+    for (const key of INTERNET_ADDONS) next[key] = 'No internet service';
+  } else {
+    for (const key of INTERNET_ADDONS) {
+      if (next[key] === 'No internet service') next[key] = 'No';
+    }
+  }
+
+  if (next.PhoneService === 'No') {
+    next.MultipleLines = 'No phone service';
+  } else if (next.MultipleLines === 'No phone service') {
+    next.MultipleLines = 'No';
+  }
+
+  return next as CustomerInput;
+}
 
 export default function CustomerFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +67,7 @@ export default function CustomerFormPage() {
         for (const field of CUSTOMER_FIELDS) {
           (next as Record<string, unknown>)[field.key] = c[field.key];
         }
-        setForm(next);
+        setForm(normalizeCoherence(next));
       })
       .catch((err) => {
         if (!cancelled) setError(getErrorMessage(err, 'No se pudo cargar el cliente'));
@@ -52,8 +86,20 @@ export default function CustomerFormPage() {
     if (field?.type === 'number' || key === 'SeniorCitizen') {
       parsed = value === '' ? 0 : Number(value);
     }
-    setForm((prev) => ({ ...prev, [key]: parsed }));
+    setForm((prev) => normalizeCoherence({ ...prev, [key]: parsed }));
   }
+
+  const internetDisabled = form.InternetService === 'No';
+  const linesDisabled = form.PhoneService === 'No';
+
+  const expectedTotal = useMemo(
+    () => Math.round(form.tenure * form.MonthlyCharges * 100) / 100,
+    [form.tenure, form.MonthlyCharges],
+  );
+  const totalMismatch =
+    form.tenure > 0 &&
+    Math.abs(form.TotalCharges - expectedTotal) >
+      Math.max(50, form.MonthlyCharges);
 
   function validate(): string | null {
     if (!form.name.trim() || form.name.trim().length < 2) {
@@ -64,6 +110,9 @@ export default function CustomerFormPage() {
     }
     if (form.tenure < 0 || form.MonthlyCharges < 0 || form.TotalCharges < 0) {
       return 'Los valores numéricos no pueden ser negativos.';
+    }
+    if (form.tenure === 0 && form.TotalCharges > 0) {
+      return 'Un cliente con antigüedad 0 no puede tener gasto total mayor a 0.';
     }
     return null;
   }
@@ -80,11 +129,11 @@ export default function CustomerFormPage() {
 
     setSaving(true);
     try {
-      const payload: CustomerInput = {
+      const payload: CustomerInput = normalizeCoherence({
         ...form,
         name: form.name.trim(),
         email: form.email.trim(),
-      };
+      });
       const saved = isEdit
         ? await updateCustomer(id!, payload)
         : await createCustomer(payload);
@@ -139,33 +188,61 @@ export default function CustomerFormPage() {
             />
           </div>
 
-          {CUSTOMER_FIELDS.map((field) => (
-            <div className="field" key={field.key}>
-              <label htmlFor={field.key}>{field.label}</label>
-              {field.type === 'select' ? (
-                <select
-                  id={field.key}
-                  value={String(form[field.key])}
-                  onChange={(e) => setField(field.key, e.target.value)}
-                >
-                  {field.options.map((opt) => (
-                    <option key={String(opt.value)} value={String(opt.value)}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  id={field.key}
-                  type="number"
-                  min={field.min}
-                  step={field.step}
-                  value={String(form[field.key])}
-                  onChange={(e) => setField(field.key, e.target.value)}
-                />
-              )}
-            </div>
-          ))}
+          {CUSTOMER_FIELDS.map((field) => {
+            const disabled =
+              (INTERNET_ADDONS.includes(field.key) && internetDisabled) ||
+              (field.key === 'MultipleLines' && linesDisabled);
+
+            return (
+              <div className="field" key={field.key}>
+                <label htmlFor={field.key}>{field.label}</label>
+                {field.type === 'select' ? (
+                  <select
+                    id={field.key}
+                    value={String(form[field.key])}
+                    disabled={disabled}
+                    onChange={(e) => setField(field.key, e.target.value)}
+                  >
+                    {field.options.map((opt) => (
+                      <option key={String(opt.value)} value={String(opt.value)}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id={field.key}
+                    type="number"
+                    min={field.min}
+                    step={field.step}
+                    value={String(form[field.key])}
+                    onChange={(e) => setField(field.key, e.target.value)}
+                  />
+                )}
+                {field.key === 'TotalCharges' && (
+                  <div className="field-hint">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setField('TotalCharges', String(expectedTotal))}
+                    >
+                      = antigüedad × gasto mensual ({expectedTotal})
+                    </button>
+                    {totalMismatch && (
+                      <span className="warn">
+                        Esperado ≈ {expectedTotal}; revisá el valor.
+                      </span>
+                    )}
+                  </div>
+                )}
+                {disabled && (
+                  <span className="field-hint muted">
+                    Fijado automáticamente por coherencia.
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>

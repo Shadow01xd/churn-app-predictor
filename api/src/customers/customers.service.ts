@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -12,6 +13,7 @@ import {
   PredictChurnDto,
 } from '../predictions/dto/predict-churn.dto';
 import { Customer } from './customer.entity';
+import { checkFeatureCoherence } from './feature-coherence';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import {
   PaginatedResult,
@@ -30,6 +32,7 @@ export class CustomersService {
   ) {}
 
   async create(dto: CreateCustomerDto): Promise<Customer> {
+    this.assertCoherent(dto);
     const customer = this.customerRepo.create(dto);
     await this.runPrediction(customer);
 
@@ -84,6 +87,9 @@ export class CustomersService {
   async update(id: string, dto: UpdateCustomerDto): Promise<Customer> {
     const customer = await this.findOne(id);
     Object.assign(customer, dto);
+    // Se valida la entidad ya fusionada: los campos que no vienen en el PATCH
+    // conservan su valor previo y también deben quedar coherentes.
+    this.assertCoherent(customer);
     await this.runPrediction(customer);
 
     try {
@@ -135,6 +141,16 @@ export class CustomersService {
       customer.churn_probability = null;
       customer.risk_label = null;
       customer.predicted_at = null;
+    }
+  }
+
+  /** Lanza 400 si las features tienen combinaciones imposibles para el modelo. */
+  private assertCoherent(features: object): void {
+    const errors = checkFeatureCoherence(
+      features as Record<string, unknown>,
+    );
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
     }
   }
 
