@@ -1,8 +1,10 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
@@ -17,9 +19,20 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
+    // Los clientes son datos compartidos del equipo, así que el registro no
+    // puede quedar abierto al público: solo se permite crear la primera cuenta
+    // (la del administrador) o cuando ALLOW_REGISTRATION=true.
+    const openRegistration = this.config.get<string>('ALLOW_REGISTRATION') === 'true';
+    if (!openRegistration && (await this.userRepo.count()) > 0) {
+      throw new ForbiddenException(
+        'El registro está cerrado. Pide a un administrador que te cree una cuenta.',
+      );
+    }
+
     const exists = await this.userRepo.findOne({ where: { email: dto.email } });
     if (exists) throw new ConflictException('El email ya está registrado');
 

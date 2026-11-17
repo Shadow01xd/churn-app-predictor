@@ -35,7 +35,9 @@ import { User } from './users/user.entity';
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB'),
         entities: [User, Customer],
-        synchronize: true,
+        // Auto-sincronizar el esquema solo en desarrollo: en producción puede
+        // borrar columnas al cambiar las entidades.
+        synchronize: config.get<string>('NODE_ENV') !== 'production',
         logging: ['error'],
       }),
     }),

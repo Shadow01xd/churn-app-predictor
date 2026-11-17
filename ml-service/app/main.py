@@ -62,6 +62,9 @@ def predict_churn(customer: CustomerFeatures) -> PredictionResponse:
         prob, label = predict(customer.model_dump())
     except Exception as exc:
         logger.exception("Error en la prediccion")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # El detalle queda en el log; al cliente no se le exponen los internos.
+        raise HTTPException(
+            status_code=500, detail="No se pudo calcular la predicción."
+        ) from exc
 
     return PredictionResponse(churn_probability=prob, risk_label=label)

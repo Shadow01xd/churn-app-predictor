@@ -28,21 +28,27 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, transform: true }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('ChurnGuard API')
-    .setDescription(
-      'API de NestJS: auth y predicción de churn (delega la inferencia al microservicio FastAPI).',
-    )
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  // Swagger solo fuera de producción, para no publicar el mapa de la API.
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('ChurnGuard API')
+      .setDescription(
+        'API de NestJS: auth y predicción de churn (delega la inferencia al microservicio FastAPI).',
+      )
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const port = parseInt(process.env.API_PORT ?? '3000', 10) || 3000;
   await app.listen(port);
   console.log(`ChurnGuard API corriendo en http://localhost:${port}`);
-  console.log(`Swagger UI en http://localhost:${port}/docs`);
+  if (!isProduction) {
+    console.log(`Swagger UI en http://localhost:${port}/docs`);
+  }
 }
 
 bootstrap();
